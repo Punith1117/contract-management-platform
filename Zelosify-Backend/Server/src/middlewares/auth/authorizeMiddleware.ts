@@ -12,17 +12,28 @@ export function authorizeRole(requiredrole: string) {
     res: Response,
     next: NextFunction
   ) => {
+    // Validate the provided role string
+    if (!isValidRole(requiredrole)) {
+      res.status(400).json({ message: "Invalid role provided." });
+      return;
+    }
+
+    // 1. If user object already populated by authenticateUser (e.g. dev token or JWKS lookup)
+    if (req.user && req.user.role) {
+      if (req.user.role === requiredrole) {
+        return next();
+      } else {
+        return res.status(403).json({
+          message: `Access Denied: User role (${req.user.role}) does not match required role (${requiredrole})`,
+        });
+      }
+    }
+
     const token =
       req.headers.authorization?.split(" ")[1] || req.cookies.access_token;
 
     if (!token) {
       res.status(401).json({ message: "Missing token" });
-      return;
-    }
-
-    // Validate the provided role
-    if (!isValidRole(requiredrole)) {
-      res.status(400).json({ message: "Invalid role provided." });
       return;
     }
 
@@ -44,8 +55,8 @@ export function authorizeRole(requiredrole: string) {
           });
         }
 
-        const role = decoded.realm_access?.roles || [];
-        if (!role.includes(requiredrole)) {
+        const roles = (decoded as any).realm_access?.roles || [];
+        if (!roles.includes(requiredrole)) {
           return res.status(403).json({
             message: `Access Denied: User does not have required role ${requiredrole}`,
           });

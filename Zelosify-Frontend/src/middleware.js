@@ -77,8 +77,11 @@ export function middleware(request) {
         console.log(`Redirecting IT_VENDOR to /vendor/payments`);
         return NextResponse.redirect(new URL("/vendor/payments", request.url));
 
+      case "HIRING_MANAGER":
+        console.log(`Redirecting HIRING_MANAGER to /user`);
+        return NextResponse.redirect(new URL("/user", request.url));
+
       default:
-        // Fallback for unknown roles or missing role - redirect to base user page
         console.log(`Unknown role (${userRole}) - redirecting to /`);
         return NextResponse.redirect(new URL("/", request.url));
     }

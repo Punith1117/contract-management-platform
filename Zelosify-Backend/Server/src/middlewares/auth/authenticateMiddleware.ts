@@ -40,6 +40,31 @@ export const authenticateUser = async (
       return;
     }
 
+    // 🛠 Dev / Mock Token Support for Testing & Local Execution
+    if (process.env.NODE_ENV !== "production") {
+      if (token === "mock-vendor-token" || req.headers["x-mock-role"] === "IT_VENDOR") {
+        const vendor = await prisma.user.findFirst({
+          where: { role: "IT_VENDOR" },
+          include: { tenant: true },
+        });
+        if (vendor) {
+          req.user = vendor;
+          return next();
+        }
+      }
+
+      if (token === "mock-hm-token" || req.headers["x-mock-role"] === "HIRING_MANAGER") {
+        const hm = await prisma.user.findFirst({
+          where: { role: "HIRING_MANAGER" },
+          include: { tenant: true },
+        });
+        if (hm) {
+          req.user = hm;
+          return next();
+        }
+      }
+    }
+
     const decoded = jwt.decode(token, { complete: true });
     if (!decoded || !decoded.payload) {
       res.status(401).json({ message: "Invalid token format" });
@@ -76,6 +101,7 @@ export const authenticateUser = async (
           role: true,
           department: true,
           provider: true,
+          tenantId: true,
           tenant: {
             select: {
               tenantId: true,
