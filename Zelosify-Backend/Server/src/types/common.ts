@@ -48,6 +48,8 @@ export interface AuthenticatedUser {
   department: string;
   /** Authentication provider used */
   provider: AuthProvider;
+  /** Direct tenant identifier */
+  tenantId?: string;
   /** Tenant information for multi-tenant setup */
   tenant: UserTenant;
 }
