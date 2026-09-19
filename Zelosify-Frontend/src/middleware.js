@@ -78,8 +78,8 @@ export function middleware(request) {
         return NextResponse.redirect(new URL("/vendor/openings", request.url));
 
       case "HIRING_MANAGER":
-        console.log(`Redirecting HIRING_MANAGER to /user`);
-        return NextResponse.redirect(new URL("/user", request.url));
+        console.log(`Redirecting HIRING_MANAGER to /hiring-manager/openings`);
+        return NextResponse.redirect(new URL("/hiring-manager/openings", request.url));
 
       default:
         console.log(`Unknown role (${userRole}) - redirecting to /`);
@@ -101,6 +101,7 @@ export const config = {
     // Protected routes
     "/user/:path*",
     "/vendor/:path*",
+    "/hiring-manager/:path*",
     "/business-user/:path*",
 
     // Public paths for redirect logic
