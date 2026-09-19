@@ -1,6 +1,7 @@
 import prisma from "../../config/prisma/prisma.js";
 import { createStorageService } from "../storage/storageFactory.js";
 import { OpeningStatus } from "@prisma/client";
+import { enqueueResumeProcessingJob } from "../../queues/resumeQueue.js";
 
 const storageService = createStorageService();
 
@@ -246,6 +247,11 @@ export class VendorOpeningService {
 
       return profile;
     });
+
+    // Enqueue BullMQ job asynchronously for AI processing
+    enqueueResumeProcessingJob(newProfile.id).catch((err) =>
+      console.error("[VendorOpeningService] Queue error:", err)
+    );
 
     const parts = newProfile.s3Key.split("/");
     const lastPart = parts[parts.length - 1] || newProfile.s3Key;

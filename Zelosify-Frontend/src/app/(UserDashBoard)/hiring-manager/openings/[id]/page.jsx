@@ -299,21 +299,48 @@ export default function HiringManagerOpeningDetailPage({ params: paramsPromise }
                       </div>
 
                       {/* AI Recommendation Badge */}
-                      {hasAiData ? (
-                        <span
-                          className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${
-                            prof.recommended
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                              : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                          }`}
-                        >
-                          {prof.recommended ? "RECOMMENDED" : "NOT RECOMMENDED"}
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 flex items-center gap-1">
-                          <HelpCircle className="h-3 w-3" /> AI Pending
-                        </span>
-                      )}
+                      {(() => {
+                        const score = prof.recommendationScore;
+                        const category = prof.decisionCategory;
+
+                        if (category === "RECOMMENDED" || (score !== null && score !== undefined && score >= 0.75)) {
+                          return (
+                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              RECOMMENDED
+                            </span>
+                          );
+                        }
+
+                        if (category === "BORDERLINE" || (score !== null && score !== undefined && score >= 0.50 && score < 0.75)) {
+                          return (
+                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                              BORDERLINE
+                            </span>
+                          );
+                        }
+
+                        if (category === "NOT_RECOMMENDED" || (score !== null && score !== undefined && score < 0.50) || prof.recommended === false) {
+                          return (
+                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                              NOT RECOMMENDED
+                            </span>
+                          );
+                        }
+
+                        if (prof.recommended === true) {
+                          return (
+                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              RECOMMENDED
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 flex items-center gap-1 border border-gray-200 dark:border-gray-700">
+                            <HelpCircle className="h-3 w-3" /> AI Pending
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* AI Score & Confidence Metrics */}

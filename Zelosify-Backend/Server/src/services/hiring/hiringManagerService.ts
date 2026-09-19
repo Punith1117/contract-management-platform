@@ -158,6 +158,17 @@ export class HiringManagerService {
       const lastPart = parts[parts.length - 1] || p.s3Key;
       const fileName = lastPart.includes("_") ? lastPart.substring(lastPart.indexOf("_") + 1) : lastPart;
 
+      let decisionCategory: "RECOMMENDED" | "BORDERLINE" | "NOT_RECOMMENDED" | "PENDING" = "PENDING";
+      if (p.recommendationScore !== null && p.recommendationScore !== undefined) {
+        if (p.recommendationScore >= 0.75) {
+          decisionCategory = "RECOMMENDED";
+        } else if (p.recommendationScore >= 0.50) {
+          decisionCategory = "BORDERLINE";
+        } else {
+          decisionCategory = "NOT_RECOMMENDED";
+        }
+      }
+
       return {
         id: p.id,
         openingId: p.openingId,
@@ -174,6 +185,7 @@ export class HiringManagerService {
         // Optional AI fields (may be null!)
         recommended: p.recommended,
         recommendationScore: p.recommendationScore,
+        decisionCategory,
         recommendationReason: p.recommendationReason,
         recommendationLatencyMs: p.recommendationLatencyMs,
         recommendationVersion: p.recommendationVersion,
