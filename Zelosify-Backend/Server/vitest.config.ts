@@ -12,7 +12,7 @@ export default defineConfig({
     },
     include: ["**/tests/**/*.test.ts", "**/__tests__/**/*.test.ts"],
     exclude: ["**/dist/**", "**/build/**", "**/node_modules/**"],
-    setupFiles: [],
+    setupFiles: ["tests/setup.ts"],
   },
   resolve: {
     alias: {

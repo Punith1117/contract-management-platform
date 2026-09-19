@@ -1,12 +1,25 @@
 import Groq from "groq-sdk";
 import { z } from "zod";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+import {
+  JobRequirementsCache,
+  jobRequirementsCache,
+} from "../cache/JobRequirementsCache.js";
 
 const GROQ_MODEL =
   process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+
+let groqClient: Groq | null = null;
+
+const getGroqClient = (): Groq => {
+  if (!groqClient) {
+    groqClient = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
+    });
+  }
+
+  return groqClient;
+};
 
 const MAX_ATTEMPTS = 2;
 
@@ -33,6 +46,7 @@ export interface FeatureExtractionResult {
   requirements: JobRequirements;
   latencyMs: number;
   attempts: number;
+  cached: boolean;
   usage: {
     promptTokens: number;
     completionTokens: number;
@@ -41,6 +55,30 @@ export interface FeatureExtractionResult {
 }
 
 export class FeatureExtractionTool {
+  constructor(
+    private cache: JobRequirementsCache = jobRequirementsCache,
+  ) {}
+
+  private async readFromCache(
+    cacheKey: string,
+  ): Promise<JobRequirements | null> {
+    const raw = await this.cache.get(cacheKey);
+
+    if (raw === null || raw === undefined) {
+      return null;
+    }
+
+    try {
+      return JobRequirementsSchema.parse(raw);
+    } catch {
+      console.warn(
+        "[FeatureExtractionTool] Ignoring invalid cached job requirements.",
+      );
+
+      return null;
+    }
+  }
+
   private buildSystemPrompt(): string {
     return `
 You are a job requirement extraction component.
@@ -89,7 +127,7 @@ Return ONLY JSON:
     usage: FeatureExtractionResult["usage"];
   }> {
     const response =
-      await groq.chat.completions.create({
+      await getGroqClient().chat.completions.create({
         model: GROQ_MODEL,
         temperature: 0,
         messages: [
@@ -163,6 +201,49 @@ ${input.openingDescription ?? ""}
 
     const startTime = Date.now();
 
+    const cacheKey = this.cache.buildKey({
+      openingTitle: input.openingTitle,
+      openingDescription: input.openingDescription,
+    });
+
+    /*
+     * Job requirement extraction depends only on the opening, not on
+     * the candidate. Cache it so that every profile applied to the
+     * same opening does not trigger a redundant LLM call.
+     */
+    const cachedRequirements =
+      await this.readFromCache(cacheKey);
+
+    if (cachedRequirements) {
+      const latencyMs = Date.now() - startTime;
+
+      console.log(
+        JSON.stringify({
+          event: "feature_extraction_completed",
+          latencyMs,
+          attempts: 0,
+          cached: true,
+          usage: {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+          },
+        }),
+      );
+
+      return {
+        requirements: cachedRequirements,
+        latencyMs,
+        attempts: 0,
+        cached: true,
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        },
+      };
+    }
+
     let lastError: unknown;
 
     for (
@@ -182,11 +263,17 @@ ${input.openingDescription ?? ""}
             result.requirements,
           );
 
+        await this.cache.set(
+          cacheKey,
+          validated,
+        );
+
         console.log(
           JSON.stringify({
             event: "feature_extraction_completed",
             latencyMs,
             attempts: attempt,
+            cached: false,
             usage: result.usage,
           }),
         );
@@ -195,6 +282,7 @@ ${input.openingDescription ?? ""}
           requirements: validated,
           latencyMs,
           attempts: attempt,
+          cached: false,
           usage: result.usage,
         };
       } catch (error) {

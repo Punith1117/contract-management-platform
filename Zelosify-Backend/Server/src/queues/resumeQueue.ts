@@ -1,29 +1,10 @@
 import { Queue } from "bullmq";
 import dotenv from "dotenv";
+import { redisConnectionOptions } from "../config/redis/redisConfig.js";
 
 dotenv.config();
 
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
-
-/**
- * Parses Redis URL into connection options for BullMQ
- */
-const parseRedisUrl = (url: string) => {
-  try {
-    const parsed = new URL(url);
-    return {
-      host: parsed.hostname || "localhost",
-      port: parsed.port ? parseInt(parsed.port, 10) : 6379,
-      password: parsed.password || undefined,
-      username: parsed.username || undefined,
-      tls: parsed.protocol === "rediss:" ? {} : undefined,
-    };
-  } catch {
-    return { host: "localhost", port: 6379 };
-  }
-};
-
-export const redisConnectionOptions = parseRedisUrl(REDIS_URL);
+export { redisConnectionOptions };
 
 export const RESUME_QUEUE_NAME = "resume-processing-queue";
 
