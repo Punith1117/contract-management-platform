@@ -7,7 +7,7 @@ dotenv.config();
 
 export { redisConnectionOptions };
 
-export const RESUME_QUEUE_NAME = "resume-processing-queue";
+export const RESUME_QUEUE_NAME = process.env.RESUME_QUEUE_NAME || "resume-processing-queue";
 
 export const resumeQueue = new Queue(RESUME_QUEUE_NAME, {
   connection: redisConnectionOptions,

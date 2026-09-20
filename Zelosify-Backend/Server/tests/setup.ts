@@ -1,8 +1,9 @@
-/*
- * Unit tests must never depend on a live Redis instance. The job
- * requirements cache is disabled by default in tests; individual tests
- * inject a fake cache when they exercise caching behaviour.
- */
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.test" });
+
+process.env.NODE_ENV = "test";
+
 process.env.JOB_REQUIREMENTS_CACHE_ENABLED =
   process.env.JOB_REQUIREMENTS_CACHE_ENABLED ?? "false";
 
