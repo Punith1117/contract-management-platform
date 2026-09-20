@@ -22,6 +22,16 @@ const vendorUser = {
   tenantId: "integration-tenant",
 };
 
+const vendorUserB = {
+  id: "integration-vendor-user-b",
+  username: "integration-vendor-b",
+  email: "integration-vendor-b@test.com",
+  role: "IT_VENDOR",
+  department: "Engineering",
+  provider: "KEYCLOAK",
+  tenantId: "integration-tenant",
+};
+
 const hiringManagerUser = {
   id: "integration-hiring-manager",
   username: "integration-hiring-manager",
@@ -45,6 +55,10 @@ vi.mock(
 
         if (role === "IT_VENDOR") {
           req.user = vendorUser;
+        }
+
+        if (role === "IT_VENDOR_B") {
+          req.user = vendorUserB;
         }
 
         if (role === "HIRING_MANAGER") {
@@ -155,6 +169,7 @@ describe(
           id: {
             in: [
               vendorUser.id,
+              vendorUserB.id,
               hiringManagerUser.id,
             ],
           },
@@ -189,6 +204,18 @@ describe(
           email: vendorUser.email,
           role: "IT_VENDOR",
           department: vendorUser.department,
+          provider: "KEYCLOAK",
+          tenantId: vendorUser.tenantId,
+        },
+      });
+
+      await prisma.user.create({
+        data: {
+          id: vendorUserB.id,
+          username: vendorUserB.username,
+          email: vendorUserB.email,
+          role: "IT_VENDOR",
+          department: vendorUserB.department,
           provider: "KEYCLOAK",
           tenantId: vendorUser.tenantId,
         },
@@ -255,6 +282,7 @@ describe(
           id: {
             in: [
               vendorUser.id,
+              vendorUserB.id,
               hiringManagerUser.id,
             ],
           },
@@ -334,6 +362,44 @@ describe(
 
         expect(submittedProfile?.status).toBe("SUBMITTED");
         expect(submittedProfile?.recommended).toBeNull();
+
+        // ---------------------------------------------------------------------
+        // Verify Vendor Upload Isolation (Vendors only see their own uploads)
+        // ---------------------------------------------------------------------
+
+        // Vendor A sees their own upload
+        const vendorAGetResponse = await request(app)
+          .get(`/api/v1/vendor/openings/${openingId}`)
+          .set("x-test-role", "IT_VENDOR");
+        expect(vendorAGetResponse.status).toBe(200);
+        expect(vendorAGetResponse.body.data.profiles).toHaveLength(1);
+        expect(vendorAGetResponse.body.data.profiles[0].id).toBe(profileId);
+
+        // Vendor B in the same tenant cannot see Vendor A's upload
+        const vendorBGetResponse = await request(app)
+          .get(`/api/v1/vendor/openings/${openingId}`)
+          .set("x-test-role", "IT_VENDOR_B");
+        expect(vendorBGetResponse.status).toBe(200);
+        expect(vendorBGetResponse.body.data.profiles).toHaveLength(0);
+
+        // Vendor B count in openings list is 0
+        const vendorBListResponse = await request(app)
+          .get(`/api/v1/vendor/openings`)
+          .set("x-test-role", "IT_VENDOR_B");
+        expect(vendorBListResponse.status).toBe(200);
+        expect(vendorBListResponse.body.data[0].profilesCount).toBe(0);
+
+        // Vendor B cannot preview Vendor A's profile
+        const vendorBPreviewResponse = await request(app)
+          .get(`/api/v1/vendor/profiles/${profileId}/preview`)
+          .set("x-test-role", "IT_VENDOR_B");
+        expect(vendorBPreviewResponse.status).toBe(404);
+
+        // Vendor B cannot delete Vendor A's profile
+        const vendorBDeleteResponse = await request(app)
+          .delete(`/api/v1/vendor/profiles/${profileId}`)
+          .set("x-test-role", "IT_VENDOR_B");
+        expect(vendorBDeleteResponse.status).toBe(404);
 
         // ---------------------------------------------------------------------
         // 3. Wait for BullMQ worker + AI result

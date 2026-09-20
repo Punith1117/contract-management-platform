@@ -16,15 +16,24 @@ const getTenantId = (req: AuthenticatedRequest): string => {
 };
 
 /**
+ * Helper to safely extract vendor identifier from authenticated user request
+ */
+const getVendorIdentifier = (req: AuthenticatedRequest): string => {
+  return req.user?.email || req.user?.username || req.user?.id || "IT_VENDOR";
+};
+
+/**
  * GET /api/v1/vendor/openings
  */
 export const getVendorOpenings = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tenantId = getTenantId(req);
+    const uploadedBy = getVendorIdentifier(req);
     const { page, limit, search, status } = req.query;
 
     const result = await vendorOpeningService.getOpenings({
       tenantId,
+      uploadedBy,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       search: search ? String(search) : undefined,
@@ -47,13 +56,14 @@ export const getVendorOpenings = async (req: AuthenticatedRequest, res: Response
 export const getVendorOpeningById = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tenantId = getTenantId(req);
+    const uploadedBy = getVendorIdentifier(req);
     const { id } = req.params;
 
     if (!id) {
       return res.status(400).json({ message: "Opening ID parameter is required" });
     }
 
-    const opening = await vendorOpeningService.getOpeningById(tenantId, id);
+    const opening = await vendorOpeningService.getOpeningById(tenantId, id, uploadedBy);
 
     if (!opening) {
       return res.status(404).json({ message: "Opening not found or unauthorized" });
@@ -115,7 +125,7 @@ export const submitProfileUpload = async (req: AuthenticatedRequest, res: Respon
       return res.status(400).json({ message: "s3Key is required" });
     }
 
-    const uploadedBy = req.user?.email || req.user?.username || req.user?.id || "IT_VENDOR";
+    const uploadedBy = getVendorIdentifier(req);
 
     const profile = await vendorOpeningService.submitProfile({
       tenantId,
@@ -143,13 +153,14 @@ export const submitProfileUpload = async (req: AuthenticatedRequest, res: Respon
 export const deleteVendorProfile = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tenantId = getTenantId(req);
+    const uploadedBy = getVendorIdentifier(req);
     const profileId = Number(req.params.id);
 
     if (isNaN(profileId)) {
       return res.status(400).json({ message: "Invalid profile ID" });
     }
 
-    const result = await vendorOpeningService.softDeleteProfile(tenantId, profileId);
+    const result = await vendorOpeningService.softDeleteProfile(tenantId, profileId, uploadedBy);
     return res.status(200).json(result);
   } catch (error: any) {
     console.error("[VendorOpeningController] Error in deleteVendorProfile:", error);
@@ -166,13 +177,14 @@ export const deleteVendorProfile = async (req: AuthenticatedRequest, res: Respon
 export const previewVendorProfile = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tenantId = getTenantId(req);
+    const uploadedBy = getVendorIdentifier(req);
     const profileId = Number(req.params.id);
 
     if (isNaN(profileId)) {
       return res.status(400).json({ message: "Invalid profile ID" });
     }
 
-    const result = await vendorOpeningService.presignPreviewUrl(tenantId, profileId);
+    const result = await vendorOpeningService.presignPreviewUrl(tenantId, profileId, uploadedBy);
     return res.status(200).json(result);
   } catch (error: any) {
     console.error("[VendorOpeningController] Error in previewVendorProfile:", error);

@@ -11,6 +11,7 @@ export class VendorOpeningService {
    */
   async getOpenings(params: {
     tenantId: string;
+    uploadedBy?: string;
     page?: number;
     limit?: number;
     search?: string;
@@ -54,7 +55,10 @@ export class VendorOpeningService {
           _count: {
             select: {
               hiringProfiles: {
-                where: { isDeleted: false },
+                where: {
+                  isDeleted: false,
+                  ...(params.uploadedBy ? { uploadedBy: params.uploadedBy } : {}),
+                },
               },
             },
           },
@@ -93,7 +97,7 @@ export class VendorOpeningService {
   /**
    * Get detailed opening with active (non-deleted) submitted profiles
    */
-  async getOpeningById(tenantId: string, openingId: string) {
+  async getOpeningById(tenantId: string, openingId: string, uploadedBy?: string) {
     const opening = await prisma.opening.findFirst({
       where: {
         id: openingId,
@@ -108,7 +112,10 @@ export class VendorOpeningService {
           },
         },
         hiringProfiles: {
-          where: { isDeleted: false },
+          where: {
+            isDeleted: false,
+            ...(uploadedBy ? { uploadedBy } : {}),
+          },
           orderBy: { submittedAt: "desc" },
           select: {
             id: true,
@@ -277,13 +284,17 @@ export class VendorOpeningService {
   /**
    * Soft delete profile
    */
-  async softDeleteProfile(tenantId: string, profileId: number) {
+  async softDeleteProfile(tenantId: string, profileId: number, uploadedBy?: string) {
     const profile = await prisma.hiringProfile.findUnique({
       where: { id: profileId },
       include: { opening: true },
     });
 
-    if (!profile || profile.opening.tenantId !== tenantId) {
+    if (
+      !profile ||
+      profile.opening.tenantId !== tenantId ||
+      (uploadedBy && profile.uploadedBy !== uploadedBy)
+    ) {
       throw { status: 404, message: "Profile not found or tenant unauthorized" };
     }
 
@@ -302,13 +313,18 @@ export class VendorOpeningService {
   /**
    * Presign GET URL for PDF preview
    */
-  async presignPreviewUrl(tenantId: string, profileId: number) {
+  async presignPreviewUrl(tenantId: string, profileId: number, uploadedBy?: string) {
     const profile = await prisma.hiringProfile.findUnique({
       where: { id: profileId },
       include: { opening: true },
     });
 
-    if (!profile || profile.opening.tenantId !== tenantId || profile.isDeleted) {
+    if (
+      !profile ||
+      profile.opening.tenantId !== tenantId ||
+      profile.isDeleted ||
+      (uploadedBy && profile.uploadedBy !== uploadedBy)
+    ) {
       throw { status: 404, message: "Profile not found or unauthorized" };
     }
 
