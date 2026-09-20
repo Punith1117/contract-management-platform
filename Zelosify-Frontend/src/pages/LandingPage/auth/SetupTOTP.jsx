@@ -54,13 +54,9 @@ export default function SetupTOTP() {
 
     try {
       // The backend will use the registration_token cookie to identify the user
-      console.log("Sending TOTP verification with code:", totpCode.trim());
-
       const response = await axiosInstance.post("/auth/verify-initial-totp", {
         totp: totpCode.trim(),
       });
-
-      console.log("TOTP verification successful:", response.data);
 
       // Clear TOTP data from localStorage
       localStorage.removeItem("totpSetup");
@@ -83,7 +79,7 @@ export default function SetupTOTP() {
       } else {
         setError(
           err.response?.data?.message ||
-            "Verification failed. Please try again."
+          "Verification failed. Please try again."
         );
       }
     } finally {

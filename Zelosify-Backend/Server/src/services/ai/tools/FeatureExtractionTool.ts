@@ -1,10 +1,10 @@
 import Groq from "groq-sdk";
 import { z } from "zod";
-
 import {
   JobRequirementsCache,
   jobRequirementsCache,
 } from "../cache/JobRequirementsCache.js";
+import { AILogger } from "../utils/logger.js";
 
 const GROQ_MODEL =
   process.env.GROQ_MODEL || "openai/gpt-oss-20b";
@@ -71,10 +71,7 @@ export class FeatureExtractionTool {
     try {
       return JobRequirementsSchema.parse(raw);
     } catch {
-      console.warn(
-        "[FeatureExtractionTool] Ignoring invalid cached job requirements.",
-      );
-
+      AILogger.warn("feature_extraction_cache_invalid");
       return null;
     }
   }
@@ -126,6 +123,8 @@ Return ONLY JSON:
     requirements: JobRequirements;
     usage: FeatureExtractionResult["usage"];
   }> {
+    const llmStartTime = Date.now();
+
     const response =
       await getGroqClient().chat.completions.create({
         model: GROQ_MODEL,
@@ -155,6 +154,17 @@ ${input.openingDescription ?? ""}
         },
       });
 
+    const llmLatencyMs = Date.now() - llmStartTime;
+    const usage = response.usage;
+
+    AILogger.info("llm_call_completed", {
+      purpose: "feature_extraction",
+      model: GROQ_MODEL,
+      latencyMs: llmLatencyMs,
+      inputTokens: usage?.prompt_tokens ?? 0,
+      outputTokens: usage?.completion_tokens ?? 0,
+    });
+
     const content =
       response.choices[0]?.message?.content;
 
@@ -181,11 +191,11 @@ ${input.openingDescription ?? ""}
       requirements,
       usage: {
         promptTokens:
-          response.usage?.prompt_tokens ?? 0,
+          usage?.prompt_tokens ?? 0,
         completionTokens:
-          response.usage?.completion_tokens ?? 0,
+          usage?.completion_tokens ?? 0,
         totalTokens:
-          response.usage?.total_tokens ?? 0,
+          usage?.total_tokens ?? 0,
       },
     };
   }
@@ -206,30 +216,22 @@ ${input.openingDescription ?? ""}
       openingDescription: input.openingDescription,
     });
 
-    /*
-     * Job requirement extraction depends only on the opening, not on
-     * the candidate. Cache it so that every profile applied to the
-     * same opening does not trigger a redundant LLM call.
-     */
     const cachedRequirements =
       await this.readFromCache(cacheKey);
 
     if (cachedRequirements) {
       const latencyMs = Date.now() - startTime;
 
-      console.log(
-        JSON.stringify({
-          event: "feature_extraction_completed",
-          latencyMs,
-          attempts: 0,
-          cached: true,
-          usage: {
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0,
-          },
-        }),
-      );
+      AILogger.info("feature_extraction_completed", {
+        latencyMs,
+        attempts: 0,
+        cached: true,
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        },
+      });
 
       return {
         requirements: cachedRequirements,
@@ -268,15 +270,12 @@ ${input.openingDescription ?? ""}
           validated,
         );
 
-        console.log(
-          JSON.stringify({
-            event: "feature_extraction_completed",
-            latencyMs,
-            attempts: attempt,
-            cached: false,
-            usage: result.usage,
-          }),
-        );
+        AILogger.info("feature_extraction_completed", {
+          latencyMs,
+          attempts: attempt,
+          cached: false,
+          usage: result.usage,
+        });
 
         return {
           requirements: validated,
@@ -288,9 +287,10 @@ ${input.openingDescription ?? ""}
       } catch (error) {
         lastError = error;
 
-        console.warn(
-          `[FeatureExtractionTool] Attempt ${attempt} failed`,
-        );
+        AILogger.warn("feature_extraction_attempt_failed", {
+          attempt,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

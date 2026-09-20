@@ -61,7 +61,6 @@ export function authorizeRole(requiredrole: string) {
             message: `Access Denied: User does not have required role ${requiredrole}`,
           });
         }
-        console.log("Authorize Role Middleware Passed ✅ : ", req.user);
         next();
       }
     );

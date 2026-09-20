@@ -2,6 +2,7 @@ import Groq from "groq-sdk";
 import { z } from "zod";
 import type { StructuredResume } from "./ResumeParsingTool.js";
 import type { JobRequirements } from "./FeatureExtractionTool.js";
+import { AILogger } from "../utils/logger.js";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -148,6 +149,8 @@ Return ONLY valid JSON:
     result: SkillNormalizationResult;
     usage: SkillNormalizationExecutionResult["usage"];
   }> {
+    const llmStartTime = Date.now();
+
     const response =
       await groq.chat.completions.create({
         model: GROQ_MODEL,
@@ -172,7 +175,7 @@ Skills:
 ${JSON.stringify(input.resume.skills)}
 
 Experience:
-${input.resume.experienceYears}
+${input.resume.experience}
 
 Location:
 ${JSON.stringify(input.resume.location)}
@@ -202,6 +205,17 @@ ${JSON.stringify(input.job.requiredSkills)}
         },
       });
 
+    const llmLatencyMs = Date.now() - llmStartTime;
+    const usage = response.usage;
+
+    AILogger.info("llm_call_completed", {
+      purpose: "skill_normalization",
+      model: GROQ_MODEL,
+      latencyMs: llmLatencyMs,
+      inputTokens: usage?.prompt_tokens ?? 0,
+      outputTokens: usage?.completion_tokens ?? 0,
+    });
+
     const content =
       response.choices[0]?.message?.content;
 
@@ -226,11 +240,6 @@ ${JSON.stringify(input.job.requiredSkills)}
         parsed,
       );
 
-    /*
-     * Additional semantic consistency validation.
-     *
-     * Every required skill must be either matched or missing.
-     */
     const required =
       new Set(
         result.normalizedRequiredSkills.map(
@@ -267,11 +276,11 @@ ${JSON.stringify(input.job.requiredSkills)}
       result,
       usage: {
         promptTokens:
-          response.usage?.prompt_tokens ?? 0,
+          usage?.prompt_tokens ?? 0,
         completionTokens:
-          response.usage?.completion_tokens ?? 0,
+          usage?.completion_tokens ?? 0,
         totalTokens:
-          response.usage?.total_tokens ?? 0,
+          usage?.total_tokens ?? 0,
       },
     };
   }
@@ -322,18 +331,13 @@ ${JSON.stringify(input.job.requiredSkills)}
             result.result,
           );
 
-        console.log(
-          JSON.stringify({
-            event: "skill_normalization_completed",
-            latencyMs,
-            attempts: attempt,
-            usage: result.usage,
-            matchedSkills:
-              validated.matchedSkills,
-            missingSkills:
-              validated.missingSkills,
-          }),
-        );
+        AILogger.info("skill_normalization_completed", {
+          latencyMs,
+          attempts: attempt,
+          usage: result.usage,
+          matchedSkillsCount: validated.matchedSkills.length,
+          missingSkillsCount: validated.missingSkills.length,
+        });
 
         return {
           result: validated,
@@ -344,9 +348,10 @@ ${JSON.stringify(input.job.requiredSkills)}
       } catch (error) {
         lastError = error;
 
-        console.warn(
-          `[SkillNormalizationTool] Attempt ${attempt} failed`,
-        );
+        AILogger.warn("skill_normalization_attempt_failed", {
+          attempt,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

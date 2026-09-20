@@ -41,14 +41,6 @@ export class AwsStorageService extends StorageService {
     });
 
     this.bucket = bucketName;
-
-    // Log configuration (without sensitive data)
-    console.log("[AWS S3] Initialized with:", {
-      region,
-      bucket: bucketName,
-      endpoint: `https://s3.${region}.amazonaws.com`,
-      hasCredentials: !!accessKeyId && !!secretAccessKey,
-    });
   }
 
   async getObjectURL(key: string): Promise<string> {
@@ -69,11 +61,6 @@ export class AwsStorageService extends StorageService {
 
   async getObjectStream(key: string): Promise<Readable> {
     try {
-      console.log("[AWS S3] Getting object stream for:", {
-        bucket: this.bucket,
-        key,
-      });
-
       const command = new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
@@ -135,12 +122,6 @@ export class AwsStorageService extends StorageService {
 
   async getUploadURL(key: string): Promise<string> {
     try {
-      console.log("[AWS S3] Generating upload URL for:", {
-        bucket: this.bucket,
-        key,
-        region: process.env.S3_AWS_REGION,
-      });
-
       const command = new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
@@ -152,7 +133,6 @@ export class AwsStorageService extends StorageService {
         signableHeaders: new Set(["host"]),
       });
 
-      console.log("[AWS S3] Generated upload URL successfully");
       return url;
     } catch (error) {
       console.error("[AWS S3] Error generating upload URL:", error);

@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 import { z } from "zod";
 import { createStorageService } from "../../storage/storageFactory.js";
 import { Readable } from "stream";
+import { AILogger } from "../utils/logger.js";
 
 const storageService = createStorageService();
 
@@ -16,18 +17,6 @@ const GROQ_MODEL =
 const MAX_DOCUMENT_CHARS = 30_000;
 const MAX_EXTRACTION_ATTEMPTS = 2;
 
-/**
- * The resume parser extracts candidate facts only.
- *
- * It deliberately does NOT produce:
- * - scores
- * - recommendations
- * - confidence
- * - skill matching
- * - suitability
- *
- * Contextual skill normalization happens later.
- */
 const EmploymentPeriodSchema = z.object({
   startYear: z.number().int().min(1900).max(2100),
   endYear: z.number().int().min(1900).max(2100).nullable(),
@@ -104,13 +93,6 @@ export class ResumeParsingTool {
     });
   }
 
-  /**
-   * Treat extracted document text as untrusted input.
-   *
-   * This is only one layer of prompt-injection protection.
-   * The extraction system prompt provides the primary semantic
-   * boundary.
-   */
   private sanitizeDocument(text: string): string {
     if (!text) {
       return "";
@@ -130,7 +112,6 @@ export class ResumeParsingTool {
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
-    // Neutralize common prompt/message delimiters.
     sanitized = sanitized
       .replace(/```/g, "'''")
       .replace(/<\/?system\b[^>]*>/gi, "[DOCUMENT_TAG]")
@@ -145,11 +126,6 @@ export class ResumeParsingTool {
     return sanitized;
   }
 
-  /**
-   * Extract readable text from PPTX.
-   *
-   * The assignment requires PPTX, not legacy .ppt.
-   */
   private parsePptxBuffer(buffer: Buffer): string {
     const bufferText = buffer.toString(
       "utf8",
@@ -333,6 +309,8 @@ Return ONLY valid JSON matching this structure:
     resume: StructuredResume;
     usage: LLMUsage;
   }> {
+    const llmStartTime = Date.now();
+
     const response =
       await groq.chat.completions.create({
         model: GROQ_MODEL,
@@ -361,6 +339,17 @@ ${sanitizedText}
         },
       });
 
+    const llmLatencyMs = Date.now() - llmStartTime;
+    const usage = response.usage;
+
+    AILogger.info("llm_call_completed", {
+      purpose: "resume_parsing",
+      model: GROQ_MODEL,
+      latencyMs: llmLatencyMs,
+      inputTokens: usage?.prompt_tokens ?? 0,
+      outputTokens: usage?.completion_tokens ?? 0,
+    });
+
     const content =
       response.choices[0]?.message?.content;
 
@@ -382,19 +371,6 @@ ${sanitizedText}
 
     const resume =
       StructuredResumeSchema.parse(parsed);
-
-    console.log(
-      JSON.stringify(
-        {
-          event: "resume_extraction_result",
-          resume,
-        },
-        null,
-        2,
-      ),
-    );
-
-    const usage = response.usage;
 
     return {
       resume,
@@ -434,9 +410,10 @@ ${sanitizedText}
       } catch (error) {
         lastError = error;
 
-        console.warn(
-          `[ResumeParsingTool] Extraction attempt ${attempt} failed`,
-        );
+        AILogger.warn("resume_extraction_attempt_failed", {
+          attempt,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -448,17 +425,6 @@ ${sanitizedText}
     );
   }
 
-  /**
-   * Agent-facing tool entry point.
-   *
-   * parse_resume({ s3Key })
-   *
-   * S3
-   * → document extraction
-   * → sanitization
-   * → extraction LLM
-   * → Zod validation
-   */
   async parseResumeFromS3(
     s3Key: string,
   ): Promise<ResumeParsingResult> {
@@ -469,13 +435,6 @@ ${sanitizedText}
     }
 
     const startTime = Date.now();
-
-    console.log(
-      JSON.stringify({
-        event: "resume_parsing_started",
-        s3Key,
-      }),
-    );
 
     const document =
       await this.extractDocumentText(s3Key);
@@ -491,25 +450,18 @@ ${sanitizedText}
     const latencyMs =
       Date.now() - startTime;
 
-    /*
-     * Explicit tool-boundary validation.
-     */
     const validated =
       StructuredResumeSchema.parse(
         extraction.resume,
       );
 
-    console.log(
-      JSON.stringify({
-        event: "resume_parsing_completed",
-        s3Key,
-        latencyMs,
-        characterCount:
-          sanitizedText.length,
-        attempts: extraction.attempts,
-        usage: extraction.usage,
-      }),
-    );
+    AILogger.info("resume_parsing_completed", {
+      s3Key,
+      latencyMs,
+      characterCount: sanitizedText.length,
+      attempts: extraction.attempts,
+      usage: extraction.usage,
+    });
 
     return {
       resume: validated,

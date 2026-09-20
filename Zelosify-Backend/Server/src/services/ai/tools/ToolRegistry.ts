@@ -5,6 +5,7 @@ export interface AgentTool {
     type: "object";
     properties: Record<string, any>;
     required?: string[];
+    additionalProperties?: boolean;
   };
   execute(args: any): Promise<any> | any;
 }
@@ -49,9 +50,7 @@ export class ToolRegistry {
     if (!tool) {
       throw new Error(`[ToolRegistry] Access denied: Tool '${name}' is not in the tool registry allowlist.`);
     }
-    console.log(`[ToolRegistry] Executing tool: ${name}`);
     const result = await tool.execute(args);
-    console.log(`[ToolRegistry] Tool ${name} completed.`);
     return result;
   }
 }

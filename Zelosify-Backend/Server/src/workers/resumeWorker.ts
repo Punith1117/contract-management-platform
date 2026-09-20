@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import prisma from "../config/prisma/prisma.js";
 import { RESUME_QUEUE_NAME, redisConnectionOptions } from "../queues/resumeQueue.js";
 import { AgentOrchestrator } from "../services/ai/agent/AgentOrchestrator.js";
+import { AILogger } from "../services/ai/utils/logger.js";
 
 dotenv.config();
 
@@ -12,15 +13,17 @@ const concurrency = process.env.RESUME_WORKER_CONCURRENCY
 
 const orchestrator = new AgentOrchestrator();
 
-console.log(`[BullMQ Worker] Starting Resume Processing Worker... (Concurrency: ${concurrency})`);
-
 export const resumeWorker = new Worker(
   RESUME_QUEUE_NAME,
   async (job: Job<{ profileId: number }>) => {
     const startTime = Date.now();
     const { profileId } = job.data;
 
-    console.log(`[BullMQ Worker] Job ${job.id} started for profileId: ${profileId} (Attempt ${job.attemptsMade + 1})`);
+    AILogger.info("resume_job_started", {
+      jobId: job.id,
+      profileId,
+      attempt: job.attemptsMade + 1,
+    });
 
     // 1. Fetch hiring profile and opening metadata from PostgreSQL
     const profile = await prisma.hiringProfile.findUnique({
@@ -29,19 +32,27 @@ export const resumeWorker = new Worker(
     });
 
     if (!profile) {
-      console.warn(`[BullMQ Worker] Profile ID ${profileId} not found in database. Skipping job.`);
+      AILogger.warn("resume_job_skipped", {
+        jobId: job.id,
+        profileId,
+        reason: "not_found",
+      });
       return;
     }
 
     if (profile.isDeleted) {
-      console.warn(`[BullMQ Worker] Profile ID ${profileId} is deleted. Skipping job.`);
+      AILogger.warn("resume_job_skipped", {
+        jobId: job.id,
+        profileId,
+        reason: "deleted",
+      });
       return;
     }
 
     // 2. Execute AI Agent Orchestration Pipeline
-    console.log(`[BullMQ Worker] Executing agent analysis for profile ${profileId} on opening "${profile.opening.title}"...`);
-
     const result = await orchestrator.evaluateCandidate({
+      profileId: profile.id,
+      openingId: profile.openingId,
       s3Key: profile.s3Key,
       openingTitle: profile.opening.title,
       openingDescription: profile.opening.description,
@@ -66,9 +77,11 @@ export const resumeWorker = new Worker(
       },
     });
 
-    console.log(
-      `[BullMQ Worker] ✅ Job ${job.id} completed successfully for profile ${profile.id} in ${recommendationLatencyMs}ms. Score: ${result.recommendationScore}, Recommended: ${result.recommended}`
-    );
+    AILogger.info("resume_job_completed", {
+      jobId: job.id,
+      profileId: profile.id,
+      totalLatencyMs: recommendationLatencyMs,
+    });
   },
   {
     connection: redisConnectionOptions,
@@ -77,14 +90,16 @@ export const resumeWorker = new Worker(
 );
 
 // Worker Event Listeners
-resumeWorker.on("completed", (job) => {
-  console.log(`[BullMQ Worker Event] Job ${job.id} completed.`);
-});
-
 resumeWorker.on("failed", (job, err) => {
-  console.error(`[BullMQ Worker Event] Job ${job?.id} failed with error:`, err?.message || err);
+  AILogger.error("resume_job_failed", {
+    jobId: job?.id,
+    profileId: job?.data?.profileId,
+    error: err?.message || String(err),
+  });
 });
 
 resumeWorker.on("error", (err) => {
-  console.error("[BullMQ Worker Event] Worker error:", err);
+  AILogger.error("resume_worker_error", {
+    error: err?.message || String(err),
+  });
 });

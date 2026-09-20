@@ -53,7 +53,6 @@ export default function Register() {
 
       setIsLoading(true);
       try {
-        console.log("Submitting registration for:", formData.username);
         const requestData = {
           username: formData.username,
           email: formData.email,
@@ -67,7 +66,6 @@ export default function Register() {
         };
 
         const res = await axiosInstance.post("/auth/register", requestData);
-        console.log("Registration response:", res.data);
 
         localStorage.setItem(
           "totpSetup",

@@ -3,6 +3,7 @@ import Redis from "ioredis";
 import dotenv from "dotenv";
 
 import { redisConnectionOptions } from "../../../config/redis/redisConfig.js";
+import { AILogger } from "../utils/logger.js";
 
 dotenv.config();
 
@@ -14,12 +15,6 @@ export interface JobRequirementsCacheKeyInput {
   openingDescription?: string | null;
 }
 
-/**
- * Cache abstraction for job requirement extraction results.
- *
- * Implementations MUST fail open: a cache outage must never break
- * candidate evaluation, it should simply fall through to the LLM.
- */
 export interface JobRequirementsCache {
   buildKey(input: JobRequirementsCacheKeyInput): string;
   get(key: string): Promise<unknown | null>;
@@ -79,11 +74,9 @@ export class RedisJobRequirementsCache
       });
 
       this.client.on("error", (error) => {
-        console.warn(
-          `[JobRequirementsCache] Redis error (failing open): ${
-            error?.message || error
-          }`,
-        );
+        AILogger.warn("cache_redis_error", {
+          error: error?.message || String(error),
+        });
       });
     }
 
@@ -108,11 +101,9 @@ export class RedisJobRequirementsCache
 
       return JSON.parse(raw);
     } catch (error: any) {
-      console.warn(
-        `[JobRequirementsCache] get failed (failing open): ${
-          error?.message || error
-        }`,
-      );
+      AILogger.warn("cache_get_failed", {
+        error: error?.message || String(error),
+      });
 
       return null;
     }
@@ -135,11 +126,9 @@ export class RedisJobRequirementsCache
         ttlSeconds ?? this.getTtlSeconds(),
       );
     } catch (error: any) {
-      console.warn(
-        `[JobRequirementsCache] set failed (failing open): ${
-          error?.message || error
-        }`,
-      );
+      AILogger.warn("cache_set_failed", {
+        error: error?.message || String(error),
+      });
     }
   }
 }

@@ -12,7 +12,6 @@ export const logout = asyncHandler(
       const refreshToken =
         req.cookies.refresh_token || req.headers.authorization?.split(" ")[1];
       if (!refreshToken) {
-        console.log("⚠️ No refresh token found, already logged out.");
         res
           .status(400)
           .json({ message: "No refresh token found, already logged out" });
@@ -21,7 +20,6 @@ export const logout = asyncHandler(
       // Assuming that authentication middleware attaches req.user:
       // Use type assertion to access req.user
       const user = (req as any).user;
-      console.log("Logging out user:", user);
 
       // Check if this is a Keycloak user or OAuth user.
       if (user && user.provider === "KEYCLOAK") {
@@ -43,7 +41,6 @@ export const logout = asyncHandler(
             }),
             { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
           );
-          console.log("Keycloak session invalidated for user.");
         } catch (error: any) {
           // Type as 'any' for axios error
           console.error(
@@ -55,7 +52,6 @@ export const logout = asyncHandler(
         }
       } else {
         // For OAuth users (Google/Microsoft), you may not need to call an external logout endpoint.
-        console.log("OAuth user logout: just clearing cookies.");
       }
 
       // Clear cookies securely
@@ -71,7 +67,6 @@ export const logout = asyncHandler(
         sameSite: "strict",
         path: "/",
       });
-      console.log("Cookies cleared successfully.");
 
       res.status(200).json({ message: "Logged out successfully" });
       return;

@@ -30,7 +30,7 @@ export const getUserDetails = async (
     });
 
     if (!user) {
-      console.log(`❌ User not found: ${userId}`);
+      console.error(`❌ User not found: ${userId}`);
       res.status(401).json({ message: "User not found" });
       return;
     }

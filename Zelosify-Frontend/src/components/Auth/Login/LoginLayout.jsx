@@ -47,9 +47,8 @@ export default function LoginLayout() {
     if (user && loginStage === "totp") {
       // Store role in cookie for middleware
       if (user.role) {
-        document.cookie = `role=${user.role}; path=/; max-age=${
-          60 * 60 * 24 * 7
-        }`; // 7 days
+        document.cookie = `role=${user.role}; path=/; max-age=${60 * 60 * 24 * 7
+          }`; // 7 days
       }
     }
   }, [user, loginStage]);
@@ -66,13 +65,11 @@ export default function LoginLayout() {
       if (loginStage === "credentials") {
         // Step 1: Verify username/email and password
         try {
-          console.log("Verifying credentials for:", formData.usernameOrEmail);
           const resultAction = await handleLogin({
             usernameOrEmail: formData.usernameOrEmail,
             password: formData.password,
           });
 
-          console.log("Verify login response:", resultAction);
           if (
             resultAction.message ===
             "Login verified. Please enter your TOTP code."
@@ -91,19 +88,12 @@ export default function LoginLayout() {
       } else if (loginStage === "totp") {
         // Step 2: Verify TOTP code
         try {
-          console.log("Submitting TOTP code:", formData.totp);
           const resultAction = await handleVerifyTOTP({
             totp: formData.totp,
           });
 
-          console.log("TOTP verification successful:", resultAction);
-
           // Ensure we redirect properly regardless of the exact message
           if (resultAction.user) {
-            console.log(
-              "Authentication successful, letting middleware handle redirect..."
-            );
-
             // Force a small delay to ensure cookies are set
             setTimeout(() => {
               // Let middleware handle the role-based redirect

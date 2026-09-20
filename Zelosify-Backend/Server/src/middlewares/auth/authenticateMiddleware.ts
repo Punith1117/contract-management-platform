@@ -112,7 +112,6 @@ export const authenticateUser = async (
       });
 
       if (!user) {
-        console.log(`❌ User not found: ${verified.sub}`);
         res.status(401).json({ message: "User not found" });
         return;
       }
@@ -122,7 +121,6 @@ export const authenticateUser = async (
         data: user,
         timestamp: Date.now(),
       });
-      console.log("Authenticate Middleware Passed ✅ : ", user);
 
       req.user = user;
       next();

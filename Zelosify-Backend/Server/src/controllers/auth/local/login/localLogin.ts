@@ -59,8 +59,6 @@ export const verifyLogin = async (
 
     const clientSecret = await getKeycloakClientSecret();
 
-    console.log("🔹 Attempting Keycloak login with:", user.email);
-
     try {
       const tokenResponse = await axios.post(
         `${process.env.KEYCLOAK_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/token`,
@@ -77,10 +75,6 @@ export const verifyLogin = async (
       // Special handling for seeded users (user0, user1, etc.)
       // lines 403-446
       if (user.username && /^user\d+$/.test(user.username)) {
-        console.log(
-          `🔹 Detected seeded user ${user.username}, bypassing TOTP verification`
-        );
-
         // Extract tokens from Keycloak response
         const { access_token, refresh_token } = tokenResponse.data;
 

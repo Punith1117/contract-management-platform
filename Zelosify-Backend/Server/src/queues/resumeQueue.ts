@@ -1,6 +1,7 @@
 import { Queue } from "bullmq";
 import dotenv from "dotenv";
 import { redisConnectionOptions } from "../config/redis/redisConfig.js";
+import { AILogger } from "../services/ai/utils/logger.js";
 
 dotenv.config();
 
@@ -33,10 +34,12 @@ export async function enqueueResumeProcessingJob(profileId: number) {
         jobId: `profile-${profileId}`, // Ensure job deduplication per profile
       }
     );
-    console.log(`[BullMQ Producer] Enqueued resume processing job (JobId: ${job.id}) for profileId: ${profileId}`);
     return job;
   } catch (error: any) {
-    console.error(`[BullMQ Producer] Failed to enqueue job for profileId ${profileId}:`, error?.message || error);
+    AILogger.error("resume_job_enqueue_failed", {
+      profileId,
+      error: error?.message || String(error),
+    });
     return null;
   }
 }

@@ -59,30 +59,22 @@ export function middleware(request) {
   // Redirect logged in users away from public pages except during registration
   if (isPublicPath && isAuthenticated) {
     // Role-based redirection
-    console.log("User Role = ", userRole);
     switch (userRole) {
       case "VENDOR_MANAGER":
-        console.log(`Redirecting VENDOR_MANAGER to /user`);
         return NextResponse.redirect(new URL("/user", request.url));
 
       case "BUSINESS_USER":
-        console.log(
-          `Redirecting BUSINESS_USER to /business-user/digital-initiative`
-        );
         return NextResponse.redirect(
           new URL("/business-user/digital-initiative", request.url)
         );
 
       case "IT_VENDOR":
-        console.log(`Redirecting IT_VENDOR to /vendor/openings`);
         return NextResponse.redirect(new URL("/vendor/openings", request.url));
 
       case "HIRING_MANAGER":
-        console.log(`Redirecting HIRING_MANAGER to /hiring-manager/openings`);
         return NextResponse.redirect(new URL("/hiring-manager/openings", request.url));
 
       default:
-        console.log(`Unknown role (${userRole}) - redirecting to /`);
         return NextResponse.redirect(new URL("/", request.url));
     }
   }
