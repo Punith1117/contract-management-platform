@@ -76,16 +76,16 @@ flowchart TD
     ORCH -->|Validated recommendation result| SVC
     SVC --> DB
 
-    classDef client fill:#e8f4ff,stroke:#2563eb,stroke-width:2px
-    classDef application fill:#f0fdf4,stroke:#16a34a,stroke-width:2px
-    classDef infrastructure fill:#fff7ed,stroke:#ea580c,stroke-width:2px
-    classDef ai fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px
-    classDef cache fill:#fdf4ff,stroke:#c026d3,stroke-width:2px
+    classDef client fill:#e8f4ff,stroke:#2563eb,stroke-width:2px,color:#111827
+    classDef application fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#111827
+    classDef infrastructure fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#111827
+    classDef ai fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px,color:#111827
+    classDef cache fill:#fdf4ff,stroke:#c026d3,stroke-width:2px,color:#111827
 
     class V,H client
-    class API,SEC,CTRL,SVC,WORKER application
+    class API,SEC,CTRL,SVC,WORKER,ORCH application
     class DB,S3,REDIS,QUEUE infrastructure
-    class ORCH,LLM,REG,RPT,FET,SNT,DSE ai
+    class LLM,REG,RPT,FET,SNT,DSE ai
     class JC cache
 ```
 
