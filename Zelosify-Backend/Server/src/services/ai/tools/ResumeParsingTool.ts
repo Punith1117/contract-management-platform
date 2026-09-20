@@ -1,4 +1,8 @@
+// Polyfill for pptx-parser browser dependency
+(globalThis as any).window = globalThis;
+
 import { PDFParse } from "pdf-parse";
+import pptxParser from "pptx-parser";
 import Groq from "groq-sdk";
 import { z } from "zod";
 import { createStorageService } from "../../storage/storageFactory.js";
@@ -126,37 +130,6 @@ export class ResumeParsingTool {
     return sanitized;
   }
 
-  private parsePptxBuffer(buffer: Buffer): string {
-    const bufferText = buffer.toString(
-      "utf8",
-      0,
-      Math.min(buffer.length, 1_000_000),
-    );
-
-    const textMatches: string[] = [];
-
-    const textRegex =
-      /<a:t[^>]*>([\s\S]*?)<\/a:t>/gi;
-
-    let match: RegExpExecArray | null;
-
-    while (
-      (match = textRegex.exec(bufferText)) !== null
-    ) {
-      const value = match[1]
-        ?.replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .trim();
-
-      if (value) {
-        textMatches.push(value);
-      }
-    }
-
-    return textMatches.join("\n");
-  }
-
   private async extractDocumentText(
     s3Key: string,
   ): Promise<DocumentExtractionResult> {
@@ -169,15 +142,29 @@ export class ResumeParsingTool {
     const lowerKey = s3Key.toLowerCase();
 
     if (lowerKey.endsWith(".pptx")) {
-      const text = this.parsePptxBuffer(buffer);
-
-      return {
-        text,
-        characterCount: text.length,
-      };
+      return await this.extractResumeText(
+        buffer,
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      );
     }
 
     if (lowerKey.endsWith(".pdf")) {
+      return await this.extractResumeText(
+        buffer,
+        "application/pdf",
+      );
+    }
+
+    throw new Error(
+      "Unsupported resume format. Only PDF and PPTX are supported.",
+    );
+  }
+
+  async extractResumeText(
+    buffer: Buffer,
+    fileType: string,
+  ): Promise<DocumentExtractionResult> {
+    if (fileType === "application/pdf") {
       const pdf = new PDFParse({
         data: buffer,
       });
@@ -193,6 +180,17 @@ export class ResumeParsingTool {
       } finally {
         await pdf.destroy();
       }
+    }
+
+    if (
+      fileType ===
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ) {
+      const text = await pptxParser(buffer);
+      return {
+        text,
+        characterCount: text.length,
+      };
     }
 
     throw new Error(

@@ -1,3 +1,6 @@
+// Polyfill for pptx-parser browser dependency - must be first import
+import "./utils/polyfill.js";
+
 // Core Express and Node.js libraries
 import dotenv from "dotenv";
 

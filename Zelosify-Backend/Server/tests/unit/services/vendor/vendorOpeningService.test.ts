@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findFirstMock } = vi.hoisted(() => ({
+const { findFirstMock, transactionMock, presignMock } = vi.hoisted(() => ({
   findFirstMock: vi.fn(),
+  transactionMock: vi.fn(),
+  presignMock: vi.fn(),
 }));
 
 vi.mock("../../../../src/config/prisma/prisma.js", () => ({
@@ -9,18 +11,19 @@ vi.mock("../../../../src/config/prisma/prisma.js", () => ({
     opening: {
       findFirst: findFirstMock,
     },
+    $transaction: transactionMock,
   },
 }));
 
 vi.mock("../../../../src/services/storage/storageFactory.js", () => ({
   createStorageService: vi.fn(() => ({
-    getUploadURL: vi.fn(),
+    getUploadURL: presignMock,
     getObjectURL: vi.fn(),
   })),
 }));
 
 vi.mock("../../../../src/queues/resumeQueue.js", () => ({
-  enqueueResumeProcessingJob: vi.fn(),
+  enqueueResumeProcessingJob: vi.fn(() => Promise.resolve().catch(() => {})),
 }));
 
 import { VendorOpeningService } from "../../../../src/services/vendor/vendorOpeningService.js";
@@ -30,6 +33,17 @@ describe("VendorOpeningService - tenant isolation", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    transactionMock.mockResolvedValue({
+      id: 1,
+      tenantId: "tenant-A",
+      openingId: "opening-from-tenant-B",
+      s3Key: "tenant-A/opening-from-tenant-B/resume.pdf",
+      uploadedBy: "vendor-a@example.com",
+      status: "SUBMITTED",
+      isDeleted: false,
+      submittedAt: new Date(),
+    });
+    presignMock.mockResolvedValue("https://presigned-url.example.com");
   });
 
   it("does not return an opening belonging to another tenant", async () => {
@@ -65,6 +79,82 @@ describe("VendorOpeningService - tenant isolation", () => {
       }),
     ).rejects.toMatchObject({
       status: 404,
+    });
+
+    expect(findFirstMock).toHaveBeenCalledWith({
+      where: {
+        id: "opening-from-tenant-B",
+        tenantId: "tenant-A",
+      },
+    });
+  });
+
+  it("accepts PPTX resumes with correct MIME type", async () => {
+    findFirstMock.mockResolvedValue({
+      id: "opening-from-tenant-B",
+      tenantId: "tenant-A",
+      status: "OPEN",
+    });
+
+    await expect(
+      service.submitProfile({
+        tenantId: "tenant-A",
+        openingId: "opening-from-tenant-B",
+        s3Key: "tenant-A/opening-from-tenant-B/resume.pptx",
+        uploadedBy: "vendor-a@example.com",
+      }),
+    ).resolves.toBeDefined();
+
+    expect(findFirstMock).toHaveBeenCalledWith({
+      where: {
+        id: "opening-from-tenant-B",
+        tenantId: "tenant-A",
+      },
+    });
+  });
+
+  it("accepts PPTX resumes with .pptx extension", async () => {
+    findFirstMock.mockResolvedValue({
+      id: "opening-from-tenant-B",
+      tenantId: "tenant-A",
+      status: "OPEN",
+    });
+
+    await expect(
+      service.submitProfile({
+        tenantId: "tenant-A",
+        openingId: "opening-from-tenant-B",
+        s3Key: "tenant-A/opening-from-tenant-B/resume.pptx",
+        uploadedBy: "vendor-a@example.com",
+      }),
+    ).resolves.toBeDefined();
+
+    expect(findFirstMock).toHaveBeenCalledWith({
+      where: {
+        id: "opening-from-tenant-B",
+        tenantId: "tenant-A",
+      },
+    });
+  });
+
+  it("rejects unsupported file types in presignProfileUpload", async () => {
+    findFirstMock.mockResolvedValue({
+      id: "opening-from-tenant-B",
+      tenantId: "tenant-A",
+      status: "OPEN",
+    });
+
+    await expect(
+      service.presignProfileUpload({
+        tenantId: "tenant-A",
+        openingId: "opening-from-tenant-B",
+        fileName: "resume.doc",
+        contentType: "application/msword",
+        fileSize: 1024,
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Only PDF and PPTX resumes are accepted",
     });
 
     expect(findFirstMock).toHaveBeenCalledWith({

@@ -1,3 +1,6 @@
+// Polyfill for pptx-parser browser dependency - must be first import
+import "../utils/polyfill.js";
+
 import { Worker, Job } from "bullmq";
 import dotenv from "dotenv";
 import prisma from "../config/prisma/prisma.js";

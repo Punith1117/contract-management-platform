@@ -75,9 +75,15 @@ export default function VendorOpeningDetailPage({ params: paramsPromise }) {
   };
 
   const validateFile = (file) => {
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      return { valid: false, reason: "Only PDF files supported" };
+    const isPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
+    const isPptx =
+      file.type ===
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+      file.name.toLowerCase().endsWith(".pptx");
+    if (!isPdf && !isPptx) {
+      return { valid: false, reason: "Only PDF and PPTX files supported" };
     }
 
     const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -397,7 +403,7 @@ export default function VendorOpeningDetailPage({ params: paramsPromise }) {
               id="resume-file-input"
               type="file"
               multiple
-              accept=".pdf,application/pdf"
+              accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
               onChange={handleFileSelect}
               className="hidden"
               disabled={uploading}
@@ -412,7 +418,7 @@ export default function VendorOpeningDetailPage({ params: paramsPromise }) {
                     browse files
                   </label>
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">PDF format only (Max 10 MB per resume)</p>
+                <p className="text-xs text-muted-foreground mt-1">PDF or PPTX format only (Max 10 MB per resume)</p>
               </div>
             </div>
           </div>

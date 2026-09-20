@@ -183,8 +183,14 @@ export class VendorOpeningService {
       throw { status: 400, message: `Opening is currently ${opening.status} and not accepting submissions` };
     }
 
-    if (params.contentType !== "application/pdf" && !params.fileName.toLowerCase().endsWith(".pdf")) {
-      throw { status: 400, message: "Only PDF resumes are accepted" };
+    if (
+      params.contentType !== "application/pdf" &&
+      !params.fileName.toLowerCase().endsWith(".pdf") &&
+      params.contentType !==
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" &&
+      !params.fileName.toLowerCase().endsWith(".pptx")
+    ) {
+      throw { status: 400, message: "Only PDF and PPTX resumes are accepted" };
     }
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB

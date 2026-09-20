@@ -9,3 +9,6 @@ process.env.JOB_REQUIREMENTS_CACHE_ENABLED =
 
 process.env.GROQ_API_KEY =
   process.env.GROQ_API_KEY ?? "test-groq-key";
+
+// Polyfill for pptx-parser browser dependency
+globalThis.window = globalThis;
