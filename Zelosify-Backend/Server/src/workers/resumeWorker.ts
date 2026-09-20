@@ -8,7 +8,7 @@ dotenv.config();
 
 const concurrency = process.env.RESUME_WORKER_CONCURRENCY
   ? parseInt(process.env.RESUME_WORKER_CONCURRENCY, 10)
-  : 2;
+  : 1;
 
 const orchestrator = new AgentOrchestrator();
 

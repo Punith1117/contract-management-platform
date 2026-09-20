@@ -29,6 +29,10 @@ import {
   LLMAnalysisSchema,
 } from "../validator/SchemaValidator.js";
 
+import {
+  ExperienceCalculationEngine,
+} from "../tools/ExperienceCalculationEngine.js";
+
 dotenv.config();
 
 export class AgentOrchestrator {
@@ -36,6 +40,7 @@ export class AgentOrchestrator {
   private featureTool = new FeatureExtractionTool();
   private normalizerTool = new SkillNormalizationTool();
   private scoringTool = new DeterministicScoringEngine();
+  private experienceEngine = new ExperienceCalculationEngine();
 
   async evaluateCandidate(params: {
     s3Key: string;
@@ -109,8 +114,8 @@ export class AgentOrchestrator {
          * Do NOT expose sanitized/raw resume text.
          */
         return {
-          experienceYears:
-            result.resume.experienceYears,
+          experience:
+            result.resume.experience,
 
           skills:
             result.resume.skills,
@@ -331,7 +336,9 @@ export class AgentOrchestrator {
               normalizationResult.normalizedRequiredSkills,
 
             candidateExperienceYears:
-              parsedResume.experienceYears,
+              this.experienceEngine.calculateExperienceYears(
+                parsedResume.experience,
+              ),
 
             minExperienceRequired:
               params.experienceMin,

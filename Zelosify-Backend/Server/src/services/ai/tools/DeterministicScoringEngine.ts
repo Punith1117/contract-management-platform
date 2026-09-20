@@ -105,6 +105,12 @@ export class DeterministicScoringEngine {
     minExperienceRequired: number,
     maxExperienceRequired?: number | null
   ): number {
+    if (!Number.isFinite(candidateExperienceYears)) {
+      throw new Error(
+        "candidateExperienceYears must be a finite number.",
+      );
+    }
+
     if (candidateExperienceYears < minExperienceRequired) {
       return 0;
     }
